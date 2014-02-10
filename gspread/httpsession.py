@@ -8,6 +8,9 @@ This module contains a class for working with http sessions.
 
 """
 
+import logging
+logger = logging.getLogger(__name__)
+
 try:
     import httplib as client
     from urlparse import urlparse
@@ -70,6 +73,12 @@ class HTTPSession(object):
 
         self.connections[uri.scheme+uri.netloc].request(method, url, data, headers=request_headers)
         response = self.connections[uri.scheme+uri.netloc].getresponse()
+
+        logger.debug('"%s %s %s" %d',
+                     method,
+                     url,
+                     {10: 'HTTP/1.0', 11: 'HTTP/1.1'}[response.version],
+                     response.status)
 
         if response.status > 399:
             raise HTTPError(response)
