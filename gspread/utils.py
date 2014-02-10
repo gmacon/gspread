@@ -8,6 +8,7 @@ This module contains utility functions.
 
 """
 
+from functools import wraps
 from xml.etree import ElementTree
 
 
@@ -86,6 +87,20 @@ def numericise(value, empty2zero=False):
 def numericise_all(input, empty2zero=False):
     """Returns a list of numericised values from strings"""
     return [numericise(s, empty2zero) for s in input]
+
+
+def lazyproperty(f):
+    @wraps(f)
+    def helper(self):
+        try:
+            return self._property_cache[f.__name__]
+        except AttributeError:
+            self._property_cache = {}
+        except KeyError:
+            pass
+        v = self._property_cache[f.__name__] = f(self)
+        return v
+    return property(helper)
 
 
 if __name__ == '__main__':

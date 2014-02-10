@@ -18,7 +18,7 @@ from xml.etree.ElementTree import Element, SubElement
 
 from .ns import _ns, _ns1, ATOM_NS, BATCH_NS, SPREADSHEET_NS
 from .urls import construct_url
-from .utils import finditem, numericise_all
+from .utils import finditem, numericise_all, lazyproperty
 
 from .exceptions import IncorrectCellLabel, WorksheetNotFound, CellNotFound
 
@@ -47,15 +47,21 @@ def _escape_attrib(text, encoding=None, replace=None):
 ElementTree._escape_attrib = _escape_attrib
 
 
+_url_key_re = re.compile(r'key=([^&#]+)')
+
+
 class Spreadsheet(object):
 
     """ A class for a spreadsheet object."""
 
     def __init__(self, client, feed_entry):
         self.client = client
-        id_parts = feed_entry.find(_ns('id')).text.split('/')
-        self.id = id_parts[-1]
         self._sheet_list = []
+        self._feed_entry = feed_entry
+
+    @lazyproperty
+    def id(self):
+        return self._feed_entry.find(_ns('id')).text.split('/')[-1]
 
     def get_id_fields(self):
         return {'spreadsheet_id': self.id}
@@ -156,6 +162,17 @@ class Spreadsheet(object):
         """Shortcut property for getting the first worksheet."""
         return self.get_worksheet(0)
 
+    @lazyproperty
+    def key(self):
+        alter_link = finditem(lambda x: x.get('rel') == 'alternate',
+                              self._feed_entry.findall(_ns('link')))
+        m = _url_key_re.search(alter_link.get('href'))
+        if m:
+            return m.group(1)
+
+    @lazyproperty
+    def title(self):
+        return self._feed_entry.find(_ns('title')).text
 
 class Worksheet(object):
     """A class for worksheet object."""
