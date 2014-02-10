@@ -50,6 +50,8 @@ class Client(object):
     def __init__(self, auth, http_session=None):
         self.auth = auth
         self.session = http_session or HTTPSession()
+        self._spreadsheets_feed_cache = {}
+        self._spreadsheets_cache = None
 
     def _get_auth_token(self, content):
         for line in content.splitlines():
@@ -118,12 +120,9 @@ class Client(object):
         >>> c.open('My fancy spreadsheet')
 
         """
-        feed = self.get_spreadsheets_feed()
-
-        for elem in feed.findall(_ns('entry')):
-            elem_title = elem.find(_ns('title')).text
-            if elem_title.strip() == title:
-                return Spreadsheet(self, elem)
+        for ssheet in self.get_spreadsheets():
+            if ssheet.title == title:
+                return ssheet
         else:
             raise SpreadsheetNotFound
 
@@ -140,13 +139,9 @@ class Client(object):
         >>> c.open_by_key('0BmgG6nO_6dprdS1MN3d3MkdPa142WFRrdnRRUWl1UFE')
 
         """
-        feed = self.get_spreadsheets_feed()
-        for elem in feed.findall(_ns('entry')):
-            alter_link = finditem(lambda x: x.get('rel') == 'alternate',
-                                  elem.findall(_ns('link')))
-            m = _url_key_re.search(alter_link.get('href'))
-            if m and m.group(1) == key:
-                return Spreadsheet(self, elem)
+        for ssheet in self.get_spreadsheets():
+            if ssheet.key == key:
+                return ssheet
         else:
             raise SpreadsheetNotFound
 
@@ -178,23 +173,33 @@ class Client(object):
                       spreadsheets by title.
 
         """
-        feed = self.get_spreadsheets_feed()
-        result = []
-        for elem in feed.findall(_ns('entry')):
-            if title is not None:
-                elem_title = elem.find(_ns('title')).text
-                if elem_title.strip() != title:
-                    continue
-            result.append(Spreadsheet(self, elem))
-
-        return result
+        if title is None:
+            return self.get_spreadsheets()[:]
+        else:
+            result = []
+            for ssheet in self.get_spreadsheets():
+                if ssheet.title == title:
+                    result.append(ssheet)
+            return result
 
     def get_spreadsheets_feed(self, visibility='private', projection='full'):
-        url = construct_url('spreadsheets',
-                            visibility=visibility, projection=projection)
+        if (visibility, projection) not in self._spreadsheets_feed_cache:
+            url = construct_url('spreadsheets',
+                                visibility=visibility, projection=projection)
 
-        r = self.session.get(url)
-        return ElementTree.fromstring(r.read())
+            r = self.session.get(url)
+            feed = ElementTree.fromstring(r.read())
+            self._spreadsheets_feed_cache[(visibility, projection)] = feed
+        return self._spreadsheets_feed_cache[(visibility, projection)]
+
+    def get_spreadsheets(self):
+        if self._spreadsheets_cache is None:
+            feed = self.get_spreadsheets_feed()
+            sheets = []
+            for elem in feed.findall(_ns('entry')):
+                sheets.append(Spreadsheet(self, elem))
+            self._spreadsheets_cache = sheets
+        return self._spreadsheets_cache
 
     def get_worksheets_feed(self, spreadsheet,
                             visibility='private', projection='full'):
