@@ -71,6 +71,14 @@ class SpreadsheetTest(GspreadTest):
         title = self.config.get('Spreadsheet', 'title')
         self.spreadsheet = self.gc.open(title)
 
+    def test_properties(self):
+        self.assertEqual(self.config.get('Spreadsheet', 'id'),
+                         self.spreadsheet.id)
+        self.assertEqual(self.config.get('Spreadsheet', 'key'),
+                         self.spreadsheet.key)
+        self.assertEqual(self.config.get('Spreadsheet', 'title'),
+                         self.spreadsheet.title)
+
     def test_sheet1(self):
         sheet1 = self.spreadsheet.sheet1
         self.assertTrue(isinstance(sheet1, gspread.Worksheet))
