@@ -117,7 +117,7 @@ class WorksheetTest(GspreadTest):
 
     def test_get_addr_int(self):
         self.assertEqual(self.sheet.get_addr_int(3, 731), 'ABC3')
-        self.assertEqual(self.sheet.get_addr_int(1, 104),'CZ1')
+        self.assertEqual(self.sheet.get_addr_int(1, 104), 'CZ1')
 
     def test_addr_converters(self):
         for row in range(1, 257):
