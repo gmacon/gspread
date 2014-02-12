@@ -31,6 +31,9 @@ class HTTPError(Exception):
         self.code = response.status
         self.response = response
 
+    def __str__(self):
+        return '%d %s\n%s' % (self.code, self.response.reason, self.read())
+
     def read(self):
         return self.response.read()
 
