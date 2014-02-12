@@ -332,6 +332,63 @@ class WorksheetTest(GspreadTest):
         self.sheet.resize(num_rows, num_cols)
 
 
+class RecordsTest(GspreadTest):
+    def setUp(self):
+        super(RecordsTest, self).setUp()
+        title = self.config.get('Spreadsheet', 'title')
+        self.spreadsheet = self.gc.open(title)
+        self.spreadsheet.add_worksheet('records_tests', 10, 10)
+        self.sheet = self.spreadsheet.worksheet('records_tests')
+
+        data = [['name', 'email', 'phone', 'city'],
+                ['Fred', 'fred@example.com', '(212) 555-0100', 'New York']]
+        cell_list = self.sheet.range('A1:D1')
+        cell_list.extend(self.sheet.range('A2:D2'))
+        for cell, value in zip(cell_list, itertools.chain(*data)):
+            cell.value = value
+        self.sheet.update_cells(cell_list)
+
+    def tearDown(self):
+        # The delete sheet endpoint returns a 500 error every time
+        #self.spreadsheet.del_worksheet(self.sheet)
+        super(RecordsTest, self).tearDown()
+
+    def test_get_records(self):
+        records = self.sheet.get_records()
+        self.assertEqual([{'name': 'Fred',
+                           'email': 'fred@example.com',
+                           'phone': '(212) 555-0100',
+                           'city': 'New York'}],
+                         records)
+
+    def text_add_record(self):
+        self.sheet.add_record({'name': 'Bob',
+                               'email': 'bob@example.com',
+                               'phone': '(202) 555-0100',
+                               'city': 'Washington, D.C.'})
+        values = self.sheet.get_all_values()
+        data = [['name', 'email', 'phone', 'city'],
+                ['Fred', 'fred@example.com', '(212) 555-0100', 'New York'],
+                ['Bob', 'bob@example.com', '(202) 555-0100', 'Washington, D.c.']]
+        self.assertEqual(data, values)
+
+    def test_mod_record(self):
+        records = self.sheet.get_records()
+        records[0]['city'] = 'New York, NY'
+        records[0].save()
+        values = self.sheet.get_all_values()
+        data = [['name', 'email', 'phone', 'city'],
+                ['Fred', 'fred@example.com', '(212) 555-0100', 'New York, NY']]
+        self.assertEqual(data, values)
+
+    def test_del_record(self):
+        records = self.sheet.get_records()
+        records[0].delete()
+        values = self.sheet.get_all_values()
+        data = [['name', 'email', 'phone', 'city']]
+        self.assertEqual(data, values)
+
+
 class CellTest(GspreadTest):
     """Test for gspread.Cell."""
 

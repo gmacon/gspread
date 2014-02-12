@@ -10,15 +10,16 @@ This module contains common spreadsheets' models
 
 
 import re
-from collections import defaultdict
+from collections import defaultdict, MutableMapping
 from itertools import chain
 
 from xml.etree import ElementTree
 from xml.etree.ElementTree import Element, SubElement
 
-from .ns import _ns, _ns1, ATOM_NS, BATCH_NS, SPREADSHEET_NS
+from .ns import (_ns, _ns1, gd, gsx, ATOM_NS, BATCH_NS, SPREADSHEET_NS,
+                 SPREADSHEET_EXTENDED_NS)
 from .urls import construct_url
-from .utils import finditem, numericise_all, lazyproperty
+from .utils import finditem, numericise, numericise_all, lazyproperty
 
 from .exceptions import IncorrectCellLabel, WorksheetNotFound, CellNotFound
 
@@ -48,6 +49,12 @@ ElementTree._escape_attrib = _escape_attrib
 
 
 _url_key_re = re.compile(r'key=([^&#]+)')
+_ns_re = re.compile(r'^\{(.*)\}(.*)$')
+_record_key_normalize = re.compile('[^a-zA-Z0-9]')
+
+
+def normalize_record_key(key):
+    return _record_key_normalize.sub('', key)
 
 
 class Spreadsheet(object):
@@ -174,6 +181,7 @@ class Spreadsheet(object):
     def title(self):
         return self._feed_entry.find(_ns('title')).text
 
+
 class Worksheet(object):
     """A class for worksheet object."""
 
@@ -290,8 +298,8 @@ class Worksheet(object):
         while div:
             (div, mod) = divmod(div, 26)
             if mod == 0:
-                 mod = 26
-                 div -= 1
+                mod = 26
+                div -= 1
             column_label = chr(mod + self._MAGIC_NUMBER) + column_label
 
         label = '%s%s' % (column_label, row)
@@ -356,6 +364,47 @@ class Worksheet(object):
         rect_rows = range(1, max(rows.keys()) + 1)
 
         return [[rows[i][j] for j in rect_cols] for i in rect_rows]
+
+    def get_records(self, query=None, orderby=None, reverse=None,
+                    empty2zero=False, visibility='private', projection='full'):
+        """Get records from the spreadsheet.
+
+        Returns Row objects, which are dict-like: keys are from first
+        row of worksheet, data is from all rows until the first blank
+        row.
+
+        :param query: The structured query for data.
+        :param orderby: The column to sort by.
+        :param reverse: Sort in reverse order.
+        :param empty2zero: Convert empty values to 0.
+        :param visibility: The visibility of records to fetch.
+        :param projection: The projection of rows to fetch.
+
+        """
+        params = {}
+        if query is not None:
+            params['sq'] = unicode(query)
+
+        if orderby is not None:
+            params['orderby'] = unicode(query)
+
+        if reverse is not None:
+            if reverse:
+                params['reverse'] = 'true'
+            else:
+                params['reverse'] = 'false'
+
+        feed = self.client.get_list_feed(self, visibility, projection, params)
+
+        return [Row(self, element, empty2zero) for element in feed.findall(_ns('entry'))]
+
+    def add_record(self, data):
+        e = Element(_ns('entry'))
+        for k, v in data.items():
+            k = normalize_record_key(k)
+            se = SubElement(e, gsx(k))
+            se.text = unicode(v)
+        self.client.post_feed(construct_url('list', self), ElementTree.tostring(e))
 
     def get_all_records(self, empty2zero=False):
         """Returns a list of dictionaries, all of them having:
@@ -596,3 +645,86 @@ class Cell(object):
                                    self.row,
                                    self.col,
                                    repr(self.value))
+
+
+class Row(MutableMapping):
+    """This represents a row from the list-based feed.
+
+    This presents a dict-like interface to the row.  The keys are taken
+    from the header row, and it will refuse to allow new keys.
+
+    """
+    def __init__(self, worksheet, entry, empty2zero=False):
+        self.worksheet = worksheet
+        self.client = worksheet.spreadsheet.client
+        self._feed_entry = entry
+        self.empty2zero = empty2zero
+
+    def __getitem__(self, key):
+        key = normalize_record_key(key)
+        subel = self._feed_entry.find(gsx(key))
+        if subel is None:
+            raise KeyError(key)
+        return numericise(subel.text, self.empty2zero)
+
+    def __setitem__(self, key, value):
+        key = normalize_record_key(key)
+        subel = self._feed_entry.find(gsx(key))
+        if subel is None:
+            subel = SubElement(self._feed_entry, gsx(key))
+        subel.text = unicode(value)
+
+    def __delitem__(self, key):
+        key = normalize_record_key(key)
+        subel = self._feed_entry.find(gsx(key))
+        if subel is None:
+            raise KeyError(key)
+        self._feed_entry.remove(subel)
+
+    def __iter__(self):
+        for child in self._feed_entry.findall('*'):
+            m = _ns_re.search(child.tag)
+            ns = m.group(1)
+            tag = m.group(2)
+            if ns == SPREADSHEET_EXTENDED_NS:
+                yield tag
+
+    def __len__(self):
+        return len(list(self))
+
+    def save(self, exclusive=True):
+        """Save this row's modifications to the worksheet.
+
+        This method has last-writer-wins semantics.
+
+        If the exclusive flag is set (the default), the row will only
+        be deleted if it hasn't been modified since it was fetched.
+
+        If there was a conflicting error, an HTTPError with code=412
+        (Precondition Failed) will be raised.
+
+        """
+        edit_link = self._feed_entry.find(_ns('link') + '[@rel="edit"]').get('href')
+        headers = {}
+        if exclusive:
+            headers['If-Match'] = self._feed_entry.get(gd('etag'), '*')
+        self.client.put_feed(edit_link,
+                             ElementTree.tostring(self._feed_entry),
+                             headers=headers)
+
+    def delete(self, exclusive=True):
+        """Delete this row from the worksheet.
+
+        If the exclusive flag is set (the default), the row will only
+        be deleted if it hasn't been modified since it was fetched.
+
+        If there was a conflicting error, an HTTPError with code=412
+        (Precondition Failed) will be raised.
+
+        """
+        edit_link = self._feed_entry.find(_ns('link') + '[@rel="edit"]').get('href')
+        headers = {}
+        if exclusive:
+            headers['If-Match'] = self._feed_entry.get(gd('etag'), '*')
+        resp = self.client.session.delete(edit_link, headers=headers)
+        resp.read()

@@ -37,7 +37,8 @@ _feed_types = {'spreadsheets': 'spreadsheets/{visibility}/{projection}',
                'worksheet': 'worksheets/{spreadsheet_id}/{visibility}/{projection}/{worksheet_id}/{version}',
                'cells': 'cells/{spreadsheet_id}/{worksheet_id}/{visibility}/{projection}',
                'cells_batch': 'cells/{spreadsheet_id}/{worksheet_id}/{visibility}/{projection}/batch',
-               'cells_cell_id': 'cells/{spreadsheet_id}/{worksheet_id}/{visibility}/{projection}/{cell_id}'}
+               'cells_cell_id': 'cells/{spreadsheet_id}/{worksheet_id}/{visibility}/{projection}/{cell_id}',
+               'list': 'list/{spreadsheet_id}/{worksheet_id}/{visibility}/{projection}'}
 
 _fields_cache = {}
 

@@ -222,6 +222,15 @@ class Client(object):
         r = self.session.get(url)
         return ElementTree.fromstring(r.read())
 
+    def get_list_feed(self, worksheet, visibility, projection, params):
+        url = construct_url('list', worksheet, visibility, projection)
+
+        if params:
+            params = urlencode(params)
+            url = '%s?%s' % (url, params)
+
+        return self.get_feed(url)
+
     def get_feed(self, url):
         r = self.session.get(url)
         return ElementTree.fromstring(r.read())
