@@ -239,8 +239,10 @@ class Client(object):
         r = self.session.get(url)
         return ElementTree.fromstring(r.read())
 
-    def put_feed(self, url, data):
-        headers = {'Content-Type': 'application/atom+xml'}
+    def put_feed(self, url, data, headers=None):
+        if headers is None:
+            headers = {}
+        headers['Content-Type'] = 'application/atom+xml'
         data = self._add_xml_header(data)
 
         try:
@@ -254,8 +256,10 @@ class Client(object):
 
         return ElementTree.fromstring(r.read())
 
-    def post_feed(self, url, data):
-        headers = {'Content-Type': 'application/atom+xml'}
+    def post_feed(self, url, data, headers=None):
+        if headers is None:
+            headers = {}
+        headers['Content-Type'] = 'application/atom+xml'
         data = self._add_xml_header(data)
 
         try:
