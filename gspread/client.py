@@ -236,9 +236,8 @@ class Client(object):
         return ElementTree.fromstring(r.read())
 
     def del_worksheet(self, worksheet):
-        url = construct_url(
-            'worksheet', worksheet, 'private', 'full', worksheet_version=worksheet.version)
-        self.session.delete(url)
+        url = worksheet._element.find(_ns('link') + '[@rel="edit"]').get('href')
+        self.session.delete(url).read()
 
     def get_cells_cell_id_feed(self, worksheet, cell_id,
                                visibility='private', projection='full'):
