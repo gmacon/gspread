@@ -54,7 +54,7 @@ _record_key_normalize = re.compile('[^a-zA-Z0-9]')
 
 
 def normalize_record_key(key):
-    return _record_key_normalize.sub('', key)
+    return _record_key_normalize.sub('', key).lower()
 
 
 class Spreadsheet(object):
