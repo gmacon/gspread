@@ -361,7 +361,7 @@ class RecordsTest(GspreadTest):
                            'city': 'New York'}],
                          records)
 
-    def text_add_record(self):
+    def test_add_record(self):
         self.sheet.add_record({'name': 'Bob',
                                'email': 'bob@example.com',
                                'phone': '(202) 555-0100',
@@ -369,7 +369,7 @@ class RecordsTest(GspreadTest):
         values = self.sheet.get_all_values()
         data = [['name', 'email', 'phone', 'city'],
                 ['Fred', 'fred@example.com', '(212) 555-0100', 'New York'],
-                ['Bob', 'bob@example.com', '(202) 555-0100', 'Washington, D.c.']]
+                ['Bob', 'bob@example.com', '(202) 555-0100', 'Washington, D.C.']]
         self.assertEqual(data, values)
 
     def test_mod_record(self):
